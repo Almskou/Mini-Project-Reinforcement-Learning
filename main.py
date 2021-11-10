@@ -11,15 +11,17 @@ import os
 from numpy.random import multivariate_normal as mnormal
 
 # %% Global Variables
-XLIM = 50
-YLIM = 50
+XLIM = 30
+YLIM = 30
+NSTEP = 100
+RHO = 0.8
 
 
 # %% Gridworld Class
 class GridWorld():
     def __init__(self):
-        self.xlim = XLIM
-        self.ylim = YLIM
+        self.xlim = XLIM-1
+        self.ylim = YLIM-1
 
     def step(self, pos, action):
         """
@@ -48,6 +50,22 @@ class GridWorld():
 
         return next_state
 
+# %% Agent Class
+
+
+class Agent():
+    def __init__(self, r0, r1):
+        self.action_space = [0, 180]  # Beam direction in degrees
+        self.reward_0 = r0
+        self.reward_1 = r1
+
+    def get_action(self, state):
+        if (self.reward_0[state[0], state[1]] >=
+                self.reward_1[state[0], state[1]]):
+            return 0
+        else:
+            return 180
+
 # %% Functions
 
 
@@ -75,10 +93,10 @@ def getCov(Lx, Ly, rho):
 if __name__ == '__main__':
 
     # number of steps:
-    N = 100
+    N = NSTEP
 
     # Correlation factor of reward function
-    rho = 0.99
+    rho = RHO
 
     # Action space
     action_space = ["left", "right", "up", "down",
@@ -93,15 +111,25 @@ if __name__ == '__main__':
         cov = getCov(XLIM, YLIM, rho)
         np.save(f"cov/cov_{XLIM}x{YLIM}_{rho}.npy", cov)
 
-    # See if reward matrix is avaible:
-    if os.path.exists(f"reward/reward_{XLIM}x{YLIM}_{rho}.npy"):
-        print("Load reward matrix")
-        reward = np.load(f"reward/reward_{XLIM}x{YLIM}_{rho}.npy")
-    else:
-        print("Create reward matrix")
-        reward = mnormal(mean=np.zeros(XLIM*YLIM), cov=cov, size=1)
-        reward = reward.reshape([XLIM, YLIM])
-        np.save(f"reward/reward_{XLIM}x{YLIM}_{rho}.npy", reward)
+    # # See if reward matrix is avaible:
+    # if os.path.exists(f"reward/reward_{XLIM}x{YLIM}_{rho}.npy"):
+    #     print("Load reward matrix")
+    #     reward = np.load(f"reward/reward_{XLIM}x{YLIM}_{rho}.npy")
+    # else:
+    #     print("Create reward matrix")
+    #     reward = mnormal(mean=np.zeros(XLIM*YLIM), cov=cov, size=1)
+    #     reward = reward.reshape([XLIM, YLIM])
+    #     np.save(f"reward/reward_{XLIM}x{YLIM}_{rho}.npy", reward)
+
+    reward0 = mnormal(mean=np.zeros(XLIM*YLIM), cov=cov, size=1)
+    reward0 = reward0.reshape([XLIM, YLIM])
+
+    reward1 = mnormal(mean=np.zeros(XLIM*YLIM), cov=cov, size=1)
+    reward1 = reward1.reshape([XLIM, YLIM])
+
+    # %%
+    # Create agent
+    agent = Agent(reward0, reward1)
 
     # Get enviroment
     env = GridWorld()
@@ -110,23 +138,44 @@ if __name__ == '__main__':
     actions = np.random.choice(action_space, N, replace=True)
 
     # Create postion matrix to log path
-    pos = np.zeros([len(actions)+1, 2])
+    pos = np.zeros([len(actions)+1, 3], dtype=int)
 
     # Initialise starting point
-    pos[0, :] = np.random.randint(0, [XLIM, YLIM])
+    pos[0, 0:2] = np.random.randint(0, [XLIM-1, YLIM-1], dtype=int)
 
     # Got N steps
     for idx, action in enumerate(actions):
-        pos[idx + 1, :] = env.step(pos[idx, :], action)
+        pos[idx, 2] = agent.get_action(pos[idx, 0:2])
+        pos[idx + 1, 0:2] = env.step(pos[idx, 0:2], action)
+
+    # Get the last action
+    pos[-1, 2] = agent.get_action(pos[-1, 0:2])
 
     # %% plot
-    fig, ax = plt.subplots()
-    ax.scatter(pos[:, 0], pos[:, 1], marker=".",
-               c=np.arange(0, len(actions)+1), cmap="jet")
-    ax.set_xlim([0, XLIM])
-    ax.set_ylim([0, YLIM])
+    fig, ax = plt.subplots(2, 2)
+    s = ax[0, 0].scatter(pos[:, 0], pos[:, 1], marker=".",
+                         c=pos[:, 2], cmap="jet",
+                         vmin=0, vmax=180,)
 
-    fig, ax = plt.subplots()
-    ax.imshow(reward)
-    ax.set_xlim([0, XLIM])
-    ax.set_ylim([0, YLIM])
+    ax[0, 0].set_xlim([-1, XLIM])
+    ax[0, 0].set_ylim([-1, YLIM])
+    fig.colorbar(s, ax=ax[0, 0])
+
+    vmin = min(np.min(reward0), np.min(reward1))
+    vmax = max(np.max(reward0), np.max(reward1))
+
+    ax[1, 0].set_title("Reward 0 deg")
+    s = ax[1, 0].imshow(reward0, vmin=vmin, vmax=vmax, origin="lower",
+                        interpolation='None')
+    ax[1, 0].set_xlim([-1, XLIM])
+    ax[1, 0].set_ylim([-1, YLIM])
+    fig.colorbar(s, ax=ax[1, 0])
+
+    ax[1, 1].set_title("Reward 180 deg")
+    ax[1, 1].imshow(reward1, vmin=vmin, vmax=vmax, origin="lower",
+                    interpolation='None')
+    ax[1, 1].set_xlim([-1, XLIM])
+    ax[1, 1].set_ylim([-1, YLIM])
+
+    fig.delaxes(ax[0, 1])
+    fig.tight_layout()
