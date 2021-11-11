@@ -183,6 +183,8 @@ if __name__ == '__main__':
     else:
         print("Create covariance matrix")
         cov = getCov(XLIM, YLIM, rho)
+        if not os.path.exists("cov"):
+            os.makedirs("cov")
         np.save(f"cov/cov_{XLIM}x{YLIM}_{rho}.npy", cov)
 
     # For this example we have two beam direction 0 deg and 180 deg.
