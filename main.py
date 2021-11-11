@@ -12,11 +12,12 @@ import numba
 import numpy as np
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from numpy.random import multivariate_normal as mnormal
+from collections import defaultdict
 
 # %% Global Variables
-XLIM = 30
-YLIM = 30
-NSTEP = 100
+XLIM = 5
+YLIM = 5
+NSTEP = 10
 RHO = 0.8
 
 
@@ -78,7 +79,7 @@ class GridWorld():
 
 
 class Agent():
-    def __init__(self, r0, r1):
+    def __init__(self, reward, sigma=1, alpha=0.7):
         """
         Initialise the agent with the reward matrices. One for each direction.
 
@@ -95,8 +96,16 @@ class Agent():
 
         """
         self.action_space = [0, 180]  # Beam direction in degrees
-        self.reward_0 = r0
-        self.reward_1 = r1
+        self.reward = reward
+        self.sigma = sigma
+        self.alpha = alpha
+        self.Q = defaultdict(int)
+
+    def _get_reward(self, state, action):
+        ida = self.action_space.index(action)
+
+        return (np.sqrt(self.sigma)*np.random.randn(1) +
+                + self.reward[state[0], state[1], ida])
 
     def get_action(self, state):
         """
@@ -115,11 +124,23 @@ class Agent():
             The chosen beam direction in degrees.
 
         """
-        if (self.reward_0[state[0], state[1]] >=
-                self.reward_1[state[0], state[1]]):
-            return 0
-        else:
-            return 180
+        r_est = self.Q(state, self.action_space[0])
+        beam_dir = self.action_space[0]
+
+        for idx, action in enumerate(self.action_space):
+            if idx > 0:
+                r_est_new = self.Q(state, action)
+                if r_est_new >= r_est:
+                    r_est = r_est_new
+                    beam_dir = action
+
+        return beam_dir
+
+    def update(self, state, action):
+        R = self._get_reward(state, action)
+
+        self.Q[state, action] = (self.Q[state, action] +
+                                 alpha*(R - self.Q[state, action]))
 
 
 # %% Functions
@@ -180,6 +201,9 @@ if __name__ == '__main__':
     step_space = ["left", "right", "up", "down",
                   "left-up", "left-down", "right-up", "right-down"]
 
+    # Beam Space
+    beam_space = [0, 180]
+
     # See if cov matrix is avaible:
     if os.path.exists(f"cov/cov_{XLIM}x{YLIM}_{rho}.npy"):
         print("Load covariance matrix")
@@ -194,15 +218,14 @@ if __name__ == '__main__':
     # For this example we have two beam direction 0 deg and 180 deg.
     # Therefor we need to create a reward matrix for each beam direction.
     # Reward matrix for 0 deg.
-    reward0 = mnormal(mean=np.zeros(XLIM * YLIM), cov=cov, size=1)
-    reward0 = reward0.reshape([XLIM, YLIM])
+    reward = np.zeros([XLIM, YLIM, len(beam_space)])
 
-    # Reward matrix for 180 deg.
-    reward1 = mnormal(mean=np.zeros(XLIM * YLIM), cov=cov, size=1)
-    reward1 = reward1.reshape([XLIM, YLIM])
+    for idx, _ in enumerate(beam_space):
+        reward_tmp = mnormal(mean=np.zeros(XLIM * YLIM), cov=cov, size=1)
+        reward[:, :, idx] = reward_tmp.reshape([XLIM, YLIM])
 
     # Create agent.
-    agent = Agent(reward0, reward1)
+    agent = Agent(reward)
 
     # Get enviroment
     env = GridWorld()
@@ -252,18 +275,18 @@ if __name__ == '__main__':
                        borderpad=0,
                        )
 
-    vmin = min(np.min(reward0), np.min(reward1))
-    vmax = max(np.max(reward0), np.max(reward1))
+    vmin = min(np.min(reward[:, :, 0]), np.min(reward[:, :, 1]))
+    vmax = max(np.max(reward[:, :, 0]), np.max(reward[:, :, 1]))
 
-    ax[1, 0].set_title("Reward 0 deg")
-    s = ax[1, 0].imshow(reward0, vmin=vmin, vmax=vmax, origin="lower",
+    ax[1, 0].set_title("Reward 0 deg - mean")
+    s = ax[1, 0].imshow(reward[:, :, 0], vmin=vmin, vmax=vmax, origin="lower",
                         interpolation='None', aspect="auto")
     ax[1, 0].set_xlim([-1, XLIM])
     ax[1, 0].set_ylim([-1, YLIM])
     fig.colorbar(s, ax=ax[1, 0], cax=axins, orientation="horizontal")
 
-    ax[1, 1].set_title("Reward 180 deg")
-    ax[1, 1].imshow(reward1, vmin=vmin, vmax=vmax, origin="lower",
+    ax[1, 1].set_title("Reward 180 deg - mean")
+    ax[1, 1].imshow(reward[:, :, 1], vmin=vmin, vmax=vmax, origin="lower",
                     interpolation='None', aspect="auto")
     ax[1, 1].set_xlim([-1, XLIM])
     ax[1, 1].set_ylim([-1, YLIM])
@@ -298,8 +321,8 @@ if __name__ == '__main__':
     ax[1].legend(["deg 0", "deg 180"])
 
     # Plot the generated reward functions:
-    vmin = min(np.min(reward0), np.min(reward1))
-    vmax = max(np.max(reward0), np.max(reward1))
+    vmin = min(np.min(reward[:, :, 0]), np.min(reward[:, :, 1]))
+    vmax = max(np.max(reward[:, :, 0]), np.max(reward[:, :, 1]))
 
     axins = inset_axes(ax[0],
                        width="100%",  # width = 100% of parent_bbox width
@@ -310,16 +333,16 @@ if __name__ == '__main__':
                        borderpad=0,
                        )
 
-    ax[0].set_title("Reward 0 deg")
-    s = ax[0].imshow(reward0, vmin=vmin, vmax=vmax, origin="lower",
+    ax[0].set_title("Reward 0 deg - mean")
+    s = ax[0].imshow(reward[:, :, 0], vmin=vmin, vmax=vmax, origin="lower",
                      interpolation='None')
     ax[0].set_xlim([-1, XLIM])
     ax[0].set_ylim([-1, YLIM])
     ax[0].autoscale(False)
     fig.colorbar(s, cax=axins, ax=ax[1], orientation="horizontal")
 
-    ax[1].set_title("Reward 180 deg")
-    ax[1].imshow(reward1, vmin=vmin, vmax=vmax, origin="lower",
+    ax[1].set_title("Reward 180 deg - mean")
+    ax[1].imshow(reward[:, :, 1], vmin=vmin, vmax=vmax, origin="lower",
                  interpolation='None')
     ax[1].set_xlim([-1, XLIM])
     ax[1].set_ylim([-1, YLIM])
