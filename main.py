@@ -5,19 +5,18 @@
 
 # %% Imports
 import os
+from collections import defaultdict
 
 import matplotlib.pyplot as plt
 import numba
-
 import numpy as np
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from numpy.random import multivariate_normal as mnormal
-from collections import defaultdict
 
 # %% Global Variables
-XLIM = 5
-YLIM = 5
-NSTEP = 10
+XLIM = 50
+YLIM = 50
+NSTEP = 10000
 RHO = 0.8
 
 
@@ -76,10 +75,8 @@ class GridWorld():
 
 
 # %% Agent Class
-
-
-class Agent():
-    def __init__(self, reward, sigma=1, alpha=0.7):
+class Agent:
+    def __init__(self, reward, action_space, sigma=1, alpha=0.7 ):
         """
         Initialise the agent with the reward matrices. One for each direction.
 
@@ -95,7 +92,7 @@ class Agent():
         None.
 
         """
-        self.action_space = [0, 180]  # Beam direction in degrees
+        self.action_space = action_space  # Number of beam directions
         self.reward = reward
         self.sigma = sigma
         self.alpha = alpha
@@ -104,7 +101,7 @@ class Agent():
     def _get_reward(self, state, action):
         ida = self.action_space.index(action)
 
-        return (np.sqrt(self.sigma)*np.random.randn(1) +
+        return (np.sqrt(self.sigma) * np.random.randn(1) +
                 + self.reward[state[0], state[1], ida])
 
     def get_action(self, state):
@@ -124,12 +121,13 @@ class Agent():
             The chosen beam direction in degrees.
 
         """
-        r_est = self.Q(state, self.action_space[0])
+        state = tuple(state)
+        r_est = self.Q[state, self.action_space[0]]
         beam_dir = self.action_space[0]
 
         for idx, action in enumerate(self.action_space):
             if idx > 0:
-                r_est_new = self.Q(state, action)
+                r_est_new = self.Q[state, action]
                 if r_est_new >= r_est:
                     r_est = r_est_new
                     beam_dir = action
@@ -137,14 +135,14 @@ class Agent():
         return beam_dir
 
     def update(self, state, action):
+        state = tuple(state)
         R = self._get_reward(state, action)
 
         self.Q[state, action] = (self.Q[state, action] +
-                                 alpha*(R - self.Q[state, action]))
+                                 self.alpha * (R - self.Q[state, action]))
 
 
 # %% Functions
-
 
 @numba.jit
 def getCov(Lx, Ly, rho):
@@ -187,6 +185,34 @@ def getCov(Lx, Ly, rho):
     return cov
 
 
+def check_result(reward, Q, beam_space):
+    """
+    Checks if the highest Q-value for each state, corresponds to the optimal choice
+
+    :param reward:
+    :param Q:
+    :return:
+    """
+    optimal_choice = np.zeros_like(reward[:, :, 0])
+    Q_choice = np.zeros_like(reward[:, :, 0])
+    for x_coord in range(XLIM):
+        for y_coord in range(YLIM):
+            optimal_choice[x_coord, y_coord] = np.argmax(reward[x_coord, y_coord, :])
+            beam = beam_space[0]
+            q = Q[(x_coord, y_coord), beam]
+
+            for beam_new in beam_space:
+                q_new = Q[(x_coord, y_coord), beam_new]
+                if q_new >= q:
+                    q = q_new
+                    beam = beam_new
+
+            Q_choice[x_coord, y_coord] = beam
+
+    result = optimal_choice== Q_choice
+    return result, optimal_choice, Q_choice
+
+
 # %% main
 
 if __name__ == '__main__':
@@ -202,7 +228,7 @@ if __name__ == '__main__':
                   "left-up", "left-down", "right-up", "right-down"]
 
     # Beam Space
-    beam_space = [0, 180]
+    beam_space = range(2)
 
     # See if cov matrix is avaible:
     if os.path.exists(f"cov/cov_{XLIM}x{YLIM}_{rho}.npy"):
@@ -225,7 +251,7 @@ if __name__ == '__main__':
         reward[:, :, idx] = reward_tmp.reshape([XLIM, YLIM])
 
     # Create agent.
-    agent = Agent(reward)
+    agent = Agent(reward, action_space=beam_space)
 
     # Get enviroment
     env = GridWorld()
@@ -243,9 +269,16 @@ if __name__ == '__main__':
     for idx, step in enumerate(steps):
         pos_log[idx, 2] = agent.get_action(pos_log[idx, 0:2])
         pos_log[idx + 1, 0:2] = env.step(pos_log[idx, 0:2], step)
+        agent.update(pos_log[idx, 0:2], pos_log[idx, 2])
 
     # Get the last action
     pos_log[-1, 2] = agent.get_action(pos_log[-1, 0:2])
+
+    # Check in which positions the q-values find the optimal choice
+    resultat = check_result(reward, agent.Q, agent.action_space)[0]
+
+    percent = np.count_nonzero(resultat)/resultat.size
+    print(f'We choose the optimal choice {percent*100}% of the time')
 
     # %% plots
 
@@ -253,16 +286,16 @@ if __name__ == '__main__':
     # it has taken at a given step
     fig, ax = plt.subplots(2, 2)
     pos_log0 = pos_log[pos_log[:, 2] == 0]
-    pos_log180 = pos_log[pos_log[:, 2] == 180]
+    pos_log180 = pos_log[pos_log[:, 2] == 1]
 
     ax[0, 0].scatter(pos_log0[:, 1], pos_log0[:, 0], marker=".",
-                     vmin=0, vmax=180)
+                     vmin=0, vmax=1)
     ax[0, 0].scatter(pos_log180[:, 1], pos_log180[:, 0], marker=".",
-                     vmin=0, vmax=180)
+                     vmin=0, vmax=1)
 
     ax[0, 0].set_xlim([-1, XLIM])
     ax[0, 0].set_ylim([-1, YLIM])
-    ax[0, 0].legend(["deg 0", "deg 180"])
+    ax[0, 0].legend(["beam 0", "beam 1"])
     # fig.colorbar(s, ax=ax[0, 0])
 
     # Plot the generated reward functions:
@@ -300,7 +333,7 @@ if __name__ == '__main__':
 
     fig, ax = plt.subplots(1, 2)
     pos_log0 = pos_log[pos_log[:, 2] == 0]
-    pos_log180 = pos_log[pos_log[:, 2] == 180]
+    pos_log180 = pos_log[pos_log[:, 2] == 1]
 
     ax[0].scatter(pos_log0[:, 1], pos_log0[:, 0], marker=marker,
                   vmin=0, vmax=180, color="red", alpha=alpha)
@@ -309,16 +342,16 @@ if __name__ == '__main__':
 
     ax[0].set_xlim([-1, XLIM])
     ax[0].set_ylim([-1, YLIM])
-    ax[0].legend(["deg 0", "deg 180"])
+    ax[0].legend(["beam 0", "beam 1"])
 
     ax[1].scatter(pos_log0[:, 1], pos_log0[:, 0], marker=marker,
-                  vmin=0, vmax=180, color="red", alpha=alpha)
+                  vmin=0, vmax=1, color="red", alpha=alpha)
     ax[1].scatter(pos_log180[:, 1], pos_log180[:, 0], marker=marker,
-                  vmin=0, vmax=180, color="orange", alpha=alpha)
+                  vmin=0, vmax=1, color="orange", alpha=alpha)
 
     ax[1].set_xlim([-1, XLIM])
     ax[1].set_ylim([-1, YLIM])
-    ax[1].legend(["deg 0", "deg 180"])
+    ax[1].legend(["beam 0", "beam 1"])
 
     # Plot the generated reward functions:
     vmin = min(np.min(reward[:, :, 0]), np.min(reward[:, :, 1]))
@@ -333,7 +366,7 @@ if __name__ == '__main__':
                        borderpad=0,
                        )
 
-    ax[0].set_title("Reward 0 deg - mean")
+    ax[0].set_title("Reward beam 0 - mean")
     s = ax[0].imshow(reward[:, :, 0], vmin=vmin, vmax=vmax, origin="lower",
                      interpolation='None')
     ax[0].set_xlim([-1, XLIM])
@@ -341,7 +374,7 @@ if __name__ == '__main__':
     ax[0].autoscale(False)
     fig.colorbar(s, cax=axins, ax=ax[1], orientation="horizontal")
 
-    ax[1].set_title("Reward 180 deg - mean")
+    ax[1].set_title("Reward beam 1 - mean")
     ax[1].imshow(reward[:, :, 1], vmin=vmin, vmax=vmax, origin="lower",
                  interpolation='None')
     ax[1].set_xlim([-1, XLIM])
