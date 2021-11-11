@@ -3,11 +3,12 @@
 @author: Dennis Sand, Nicolai Almskou, Peter Fisker & Victor Nissen
 """
 
+# %% Imports
 import os
 
 import matplotlib.pyplot as plt
 import numba
-# %% Imports
+
 import numpy as np
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from numpy.random import multivariate_normal as mnormal
