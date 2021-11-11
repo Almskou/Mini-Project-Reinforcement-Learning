@@ -3,13 +3,14 @@
 @author: Dennis Sand, Nicolai Almskou, Peter Fisker & Victor Nissen
 """
 
+import os
+
+import matplotlib.pyplot as plt
+import numba
 # %% Imports
 import numpy as np
-import numba
-import matplotlib.pyplot as plt
-import os
-from numpy.random import multivariate_normal as mnormal
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+from numpy.random import multivariate_normal as mnormal
 
 # %% Global Variables
 XLIM = 30
@@ -22,8 +23,8 @@ RHO = 0.8
 class GridWorld():
     def __init__(self):
         # The limit is subtracted with 1 to avoid indices problems
-        self.xlim = XLIM-1
-        self.ylim = YLIM-1
+        self.xlim = XLIM - 1
+        self.ylim = YLIM - 1
 
     def step(self, pos, step_direction):
         """
@@ -51,25 +52,26 @@ class GridWorld():
         x, y = pos
 
         if step_direction == "left":
-            next_state = max(0, x-1), y
+            next_state = max(0, x - 1), y
         elif step_direction == "right":
-            next_state = min(self.xlim, x+1), y
+            next_state = min(self.xlim, x + 1), y
         elif step_direction == "down":
-            next_state = x, max(0, y-1)
+            next_state = x, max(0, y - 1)
         elif step_direction == "up":
-            next_state = x, min(self.ylim, y+1)
+            next_state = x, min(self.ylim, y + 1)
         elif step_direction == 'left-up':
-            next_state = max(0, x-1), min(y+1, self.ylim)
+            next_state = max(0, x - 1), min(y + 1, self.ylim)
         elif step_direction == 'left-down':
-            next_state = max(0, x-1), max(0, y-1)
+            next_state = max(0, x - 1), max(0, y - 1)
         elif step_direction == 'right-up':
-            next_state = min(self.xlim, x+1), min(y+1, self.ylim)
+            next_state = min(self.xlim, x + 1), min(y + 1, self.ylim)
         elif step_direction == 'right-down':
-            next_state = min(self.xlim, x+1), max(0, y-1)
+            next_state = min(self.xlim, x + 1), max(0, y - 1)
         else:
             raise ValueError
 
         return next_state
+
 
 # %% Agent Class
 
@@ -118,6 +120,7 @@ class Agent():
         else:
             return 180
 
+
 # %% Functions
 
 
@@ -145,19 +148,19 @@ def getCov(Lx, Ly, rho):
     """
     sigma_squared = 1
 
-    pos = np.zeros((Lx*Ly, 2))
-    cov = np.zeros((Lx*Ly, Lx*Ly))
+    pos = np.zeros((Lx * Ly, 2))
+    cov = np.zeros((Lx * Ly, Lx * Ly))
 
     # Get all the position in the grid
     for idx in range(Lx):
         for idy in range(Ly):
-            pos[idx*Ly + idy, :] = [idx, idy]
+            pos[idx * Ly + idy, :] = [idx, idy]
 
     # Calculate the covariance based on the grid position
     for idx, val in enumerate(pos):
         for idx2, val2 in enumerate(pos):
-            cov[idx, idx2] = sigma_squared*np.exp(-np.linalg.norm(val-val2)
-                                                  / (1/(1-rho)))
+            cov[idx, idx2] = sigma_squared * np.exp(-np.linalg.norm(val - val2)
+                                                    / (1 / (1 - rho)))
 
     return cov
 
@@ -190,11 +193,11 @@ if __name__ == '__main__':
     # For this example we have two beam direction 0 deg and 180 deg.
     # Therefor we need to create a reward matrix for each beam direction.
     # Reward matrix for 0 deg.
-    reward0 = mnormal(mean=np.zeros(XLIM*YLIM), cov=cov, size=1)
+    reward0 = mnormal(mean=np.zeros(XLIM * YLIM), cov=cov, size=1)
     reward0 = reward0.reshape([XLIM, YLIM])
 
     # Reward matrix for 180 deg.
-    reward1 = mnormal(mean=np.zeros(XLIM*YLIM), cov=cov, size=1)
+    reward1 = mnormal(mean=np.zeros(XLIM * YLIM), cov=cov, size=1)
     reward1 = reward1.reshape([XLIM, YLIM])
 
     # Create agent.
@@ -207,10 +210,10 @@ if __name__ == '__main__':
     steps = np.random.choice(step_space, N, replace=True)
 
     # Create postion matrix to log path
-    pos_log = np.zeros([len(steps)+1, 3], dtype=int)
+    pos_log = np.zeros([len(steps) + 1, 3], dtype=int)
 
     # Initialise starting point
-    pos_log[0, 0:2] = np.random.randint(0, [XLIM-1, YLIM-1], dtype=int)
+    pos_log[0, 0:2] = np.random.randint(0, [XLIM - 1, YLIM - 1], dtype=int)
 
     # Got N steps
     for idx, step in enumerate(steps):
@@ -322,3 +325,4 @@ if __name__ == '__main__':
     ax[1].autoscale(False)
 
     fig.tight_layout()
+    plt.show()
