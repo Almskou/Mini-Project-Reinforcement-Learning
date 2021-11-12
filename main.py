@@ -5,20 +5,21 @@
 
 # %% Imports
 import os
+
 import numpy as np
 from numpy.random import multivariate_normal as mnormal
-import helpers
+
 import classes
+import helpers
 
 # %% Global Variables
 XLIM = 30
 YLIM = 30
-NSTEP = 100000
-NEPISODES = 100
+NSTEP = 1000
+NEPISODES = 1000
 RHO = 0.8
 NBEAMS = 4
 PLOT = True
-
 
 # %% main
 
@@ -51,7 +52,8 @@ if __name__ == '__main__':
     reward = np.zeros([XLIM, YLIM, len(beam_space)])
 
     for idx, _ in enumerate(beam_space):
-        reward_tmp = 30*mnormal(mean=np.zeros(XLIM * YLIM), cov=cov, size=1)
+        reward_tmp = mnormal(mean=np.zeros(XLIM * YLIM) + 150, cov=cov, size=1)
+        # reward_tmp = 30*mnormal(mean=np.zeros(XLIM * YLIM), cov=cov, size=1)
         reward[:, :, idx] = reward_tmp.reshape([XLIM, YLIM])
 
     print('Creating agents')
@@ -60,27 +62,30 @@ if __name__ == '__main__':
     # Get environment
     env = classes.GridWorld(XLIM, YLIM, reward, sigma=1)
 
-    percent_greedy = 0
-    percent_e_greedy = 0
+    percent_greedy = np.zeros(NEPISODES)
+    percent_e_greedy = np.zeros(NEPISODES)
+    agent_greedy = classes.Agent(action_space=beam_space)
+    agent_e_greedy = classes.Agent(action_space=beam_space)
+
     for episode in range(NEPISODES):
         if not (episode % 10):
             print(episode)
-        agent_greedy = classes.Agent(action_space=beam_space)
-        agent_e_greedy = classes.Agent(action_space=beam_space)
+        # agent_greedy = classes.Agent(action_space=beam_space)
+        # agent_e_greedy = classes.Agent(action_space=beam_space)
 
         greedy_game = helpers.game(env, agent_greedy,
                                    step_space, NSTEP, 'greedy',
                                    [XLIM, YLIM])
-        percent_greedy += np.count_nonzero(greedy_game[0]) / greedy_game[0].size
+        percent_greedy[episode] = np.count_nonzero(greedy_game[0]) / greedy_game[0].size
 
         e_greedy_game = helpers.game(env, agent_e_greedy,
                                      step_space, NSTEP, 'e_greedy',
                                      [XLIM, YLIM])
-        percent_e_greedy += np.count_nonzero(e_greedy_game[0]) / e_greedy_game[0].size
+        percent_e_greedy[episode] = np.count_nonzero(e_greedy_game[0]) / e_greedy_game[0].size
 
-    print(f'We choose the optimal choice {(percent_greedy / NEPISODES) * 100}% of the time with greedy policy')
+    print(f'We choose the optimal choice {(percent_greedy[-1]) * 100}% of the time with greedy policy')
 
-    print(f'We choose the optimal choice {(percent_e_greedy / NEPISODES) * 100}% of the time with e_greedy policy')
+    print(f'We choose the optimal choice {(percent_e_greedy[-1]) * 100}% of the time with e_greedy policy')
 
     # %% plots
     if PLOT:
@@ -112,4 +117,8 @@ if __name__ == '__main__':
         fig.set_figheight(15)
         fig.set_figwidth(15)
         fig.tight_layout(pad=3.0)
+
+        plt.figure(2)
+        plt.plot(percent_greedy)
+        plt.plot(percent_e_greedy)
         plt.show()

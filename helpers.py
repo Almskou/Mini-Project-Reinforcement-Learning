@@ -3,8 +3,8 @@
 @author: Dennis Sand, Nicolai Almskou, Peter Fisker & Victor Nissen
 """
 
-import numpy as np
 import numba
+import numpy as np
 
 
 @numba.jit
@@ -42,8 +42,7 @@ def getCov(Lx, Ly, rho):
     # Calculate the covariance based on the grid position
     for idx, val in enumerate(pos):
         for idx2, val2 in enumerate(pos):
-            cov[idx, idx2] = sigma_squared * np.exp(-np.linalg.norm(val - val2)
-                                                    / (1 / (1 - rho)))
+            cov[idx, idx2] = sigma_squared * np.exp(-np.linalg.norm(val - val2) / (1 / (1 - rho)))
 
     return cov
 
