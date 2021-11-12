@@ -16,9 +16,9 @@ import helpers
 XLIM = 15
 YLIM = 15
 NSTEP = 100
-NEPISODES = 20000
+NEPISODES = 1000
 RHO = 0.8
-NBEAMS = 8
+NBEAMS = 4
 PLOT = True
 
 # %% main
@@ -49,8 +49,7 @@ if __name__ == '__main__':
     reward = np.zeros([XLIM, YLIM, len(beam_space)])
 
     for idx, _ in enumerate(beam_space):
-        reward_tmp = mnormal(mean=np.zeros(XLIM * YLIM) + 150, cov=cov, size=1)
-        # reward_tmp = 30*mnormal(mean=np.zeros(XLIM * YLIM), cov=cov, size=1)
+        reward_tmp = mnormal(mean=np.zeros(XLIM * YLIM) + 150, cov=cov*1000, size=1)
         reward[:, :, idx] = reward_tmp.reshape([XLIM, YLIM])
 
     # Get environment
@@ -58,7 +57,7 @@ if __name__ == '__main__':
 
     # Create agent.
     print('Creating agents')
-    agents = [classes.Agent(action_space=beam_space, eps=x) for x in np.linspace(0.0, 0.3, 4, endpoint=True)]
+    agents = [classes.Agent(action_space=beam_space, gamma=0.7, eps=x) for x in np.linspace(0.0, 0.01, 2, endpoint=True)]
 
     for episode in range(NEPISODES):
         if not (episode % 10):
@@ -68,7 +67,8 @@ if __name__ == '__main__':
             helpers.game(env, agent, step_space, NSTEP, 'e_greedy', [XLIM, YLIM])
 
     for agent in agents:
-        print(f'We choose the optimal choice {agent.accuracy[-1] * 100:.1f}% of the time with {agent.eps:.1f}-greedy policy')
+        print(
+            f'We choose the optimal choice {agent.accuracy[-1] * 100:.2f}% of the time with {agent.eps:.2f}-greedy policy')
 
     # %% plots
     if PLOT:
@@ -103,7 +103,7 @@ if __name__ == '__main__':
 
         plt.figure(2)
         for agent in agents:
-            plt.plot(agent.accuracy[1:]*100, label=f'Eps={agent.eps:.1f}')
+            plt.plot(agent.accuracy[1:] * 100, label=f'Eps={agent.eps:.2f}')
 
         plt.title('Epsilon-greedy with varying epsilon')
         plt.xlabel('Number of episodes')

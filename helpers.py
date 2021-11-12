@@ -29,7 +29,7 @@ def getCov(Lx, Ly, rho):
         Has dimension (Lx*Ly, Lx*Ly)
 
     """
-    sigma_squared = 1000
+    sigma_squared = 1
 
     pos = np.zeros((Lx * Ly, 2))
     cov = np.zeros((Lx * Ly, Lx * Ly))

@@ -137,8 +137,16 @@ class Agent:
                                  self.alpha * (reward - self.Q[state, action]))
 
     def update_sarsa(self, R, state, action, next_state, next_action):
-        next_state = tuple(state)
+        next_state = tuple(next_state)
         state = tuple(state)
         next_Q = self.Q[next_state, next_action]
 
-        self.Q[state, action] += self.alpha * (R + self.gamma*next_Q - self.Q[state, action])
+        self.Q[state, action] += self.alpha * (R + self.gamma * next_Q - self.Q[state, action])
+
+    def update_Q_learning(self, R, state, action, next_state):
+        next_state = tuple(next_state)
+        state = tuple(state)
+        next_action = self.greedy(next_state)
+        next_Q = self.Q[next_state, next_action]
+
+        self.Q[state, action] += self.alpha * (R + self.gamma * next_Q - self.Q[state, action])
