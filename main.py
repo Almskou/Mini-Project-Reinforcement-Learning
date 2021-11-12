@@ -13,12 +13,12 @@ import classes
 import helpers
 
 # %% Global Variables
-XLIM = 30
-YLIM = 30
-NSTEP = 1000
-NEPISODES = 1000
+XLIM = 15
+YLIM = 15
+NSTEP = 100
+NEPISODES = 20000
 RHO = 0.8
-NBEAMS = 4
+NBEAMS = 8
 PLOT = True
 
 # %% main
@@ -46,9 +46,6 @@ if __name__ == '__main__':
             os.makedirs("cov")
         np.save(f"cov/cov_{XLIM}x{YLIM}_{rho}.npy", cov)
 
-    # For this example we have two beam direction 0 deg and 180 deg.
-    # Therefor we need to create a reward matrix for each beam direction.
-    # Reward matrix for 0 deg.
     reward = np.zeros([XLIM, YLIM, len(beam_space)])
 
     for idx, _ in enumerate(beam_space):
@@ -56,36 +53,22 @@ if __name__ == '__main__':
         # reward_tmp = 30*mnormal(mean=np.zeros(XLIM * YLIM), cov=cov, size=1)
         reward[:, :, idx] = reward_tmp.reshape([XLIM, YLIM])
 
-    print('Creating agents')
-    # Create agent.
-
     # Get environment
     env = classes.GridWorld(XLIM, YLIM, reward, sigma=1)
 
-    percent_greedy = np.zeros(NEPISODES)
-    percent_e_greedy = np.zeros(NEPISODES)
-    agent_greedy = classes.Agent(action_space=beam_space)
-    agent_e_greedy = classes.Agent(action_space=beam_space)
+    # Create agent.
+    print('Creating agents')
+    agents = [classes.Agent(action_space=beam_space, eps=x) for x in np.linspace(0.0, 0.3, 4, endpoint=True)]
 
     for episode in range(NEPISODES):
         if not (episode % 10):
             print(episode)
-        # agent_greedy = classes.Agent(action_space=beam_space)
-        # agent_e_greedy = classes.Agent(action_space=beam_space)
 
-        greedy_game = helpers.game(env, agent_greedy,
-                                   step_space, NSTEP, 'greedy',
-                                   [XLIM, YLIM])
-        percent_greedy[episode] = np.count_nonzero(greedy_game[0]) / greedy_game[0].size
+        for agent in agents:
+            helpers.game(env, agent, step_space, NSTEP, 'e_greedy', [XLIM, YLIM])
 
-        e_greedy_game = helpers.game(env, agent_e_greedy,
-                                     step_space, NSTEP, 'e_greedy',
-                                     [XLIM, YLIM])
-        percent_e_greedy[episode] = np.count_nonzero(e_greedy_game[0]) / e_greedy_game[0].size
-
-    print(f'We choose the optimal choice {(percent_greedy[-1]) * 100}% of the time with greedy policy')
-
-    print(f'We choose the optimal choice {(percent_e_greedy[-1]) * 100}% of the time with e_greedy policy')
+    for agent in agents:
+        print(f'We choose the optimal choice {agent.accuracy[-1] * 100:.1f}% of the time with {agent.eps:.1f}-greedy policy')
 
     # %% plots
     if PLOT:
@@ -119,6 +102,11 @@ if __name__ == '__main__':
         fig.tight_layout(pad=3.0)
 
         plt.figure(2)
-        plt.plot(percent_greedy)
-        plt.plot(percent_e_greedy)
+        for agent in agents:
+            plt.plot(agent.accuracy[1:]*100, label=f'Eps={agent.eps:.1f}')
+
+        plt.title('Epsilon-greedy with varying epsilon')
+        plt.xlabel('Number of episodes')
+        plt.ylabel('%-age the optimal choice is chosen [%]')
+        plt.legend()
         plt.show()

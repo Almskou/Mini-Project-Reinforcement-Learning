@@ -102,4 +102,9 @@ def game(env, agent, step_space, n_step, policy, limits):
         state = next_state
         action = next_action
 
-    return check_result(env.reward, agent.Q, agent.action_space, limits)
+    result = check_result(env.reward, agent.Q, agent.action_space, limits)
+    accuracy = np.count_nonzero(result[0]) / result[0].size
+
+    agent.accuracy = np.append(agent.accuracy, accuracy)
+
+    return result

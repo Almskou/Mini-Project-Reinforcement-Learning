@@ -72,7 +72,7 @@ class GridWorld():
 
 # %% Agent Class
 class Agent:
-    def __init__(self, action_space, sigma=1, alpha=0.5, eps=0.3, gamma=1):
+    def __init__(self, action_space, sigma=1, alpha=0.25, eps=0.1, gamma=1):
         """
         Initialise the agent with the reward matrices. One for each direction.
 
@@ -93,6 +93,7 @@ class Agent:
         self.eps = eps
         self.gamma = gamma
         self.Q = defaultdict(int)
+        self.accuracy = np.zeros(1)
 
     def greedy(self, state):
         """
