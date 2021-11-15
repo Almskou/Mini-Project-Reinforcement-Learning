@@ -8,7 +8,7 @@ import numpy as np
 
 
 @numba.jit
-def getCov(Lx, Ly, rho):
+def getCov(Lx, Ly, rho, sigma_squared=1):
     """
     Calculates the covariance matrix based on a correlation factor and
     the distiance between two points in the grid
@@ -19,8 +19,10 @@ def getCov(Lx, Ly, rho):
         Size of the grids x-axis.
     Ly : INT
         Size of the grids y-axis..
-    rho : INT
+    rho : FLOAT
         Correlation factor [0,1[.
+    sigma_squared : FLOAT
+        Variance of the covariance matrix.
 
     Returns
     -------
@@ -29,7 +31,6 @@ def getCov(Lx, Ly, rho):
         Has dimension (Lx*Ly, Lx*Ly)
 
     """
-    sigma_squared = 1
 
     pos = np.zeros((Lx * Ly, 2))
     cov = np.zeros((Lx * Ly, Lx * Ly))
@@ -52,19 +53,41 @@ def check_result(reward, Q, beam_space, limits):
     Checks if the highest Q-value for each state,
     corresponds to the optimal choice
 
-    :param reward:
-    :param Q:
-    :return:
+    Parameters
+    ----------
+    reward : MATRIX
+        The reward matrix.
+    Q : DICT
+        The Q table.
+    beam_space : ARRAY
+        The possible beam directions.
+    limits : ARRAY
+        The limit for the x-axis and y-axis (XLIM, YLIM).
+
+    Returns
+    -------
+    result : MATRIX
+        A matrix containing true and false statements for each index in Q.
+    optimal_choice : MATRIX
+        The matrix which contains the optimal choices.
+    Q_choice : MATRIX
+        The matrix which contain the choices for the given Q table.
+
     """
+
     xlim, ylim = limits
 
     optimal_choice = np.zeros_like(reward[:, :, 0], dtype=float)
     Q_choice = np.zeros_like(reward[:, :, 0], dtype=float)
 
+    # iterate over all states
     for idx in range(xlim):
         for idy in range(ylim):
+
+            # Find the optimal choice for given state
             optimal_choice[idx, idy] = np.argmax(reward[idx, idy, :])
 
+            # Find the choice for the Q-table
             beam = beam_space[0]
             q = Q[(idx, idy), beam]
 
@@ -75,36 +98,79 @@ def check_result(reward, Q, beam_space, limits):
 
             Q_choice[idx, idy] = beam
 
+    # Compare
     result = optimal_choice == Q_choice
 
     return result, optimal_choice, Q_choice
 
 
-def game(env, agent, step_space, n_step, policy, limits):
+def game(env, agent, step_space, n_step, policy, limits, update):
+    """
+    Run one episode of the "game"
+
+    Parameters
+    ----------
+    env : CLASS
+        The created GridWorld enviroment.
+    agent : CLASS
+        The created agent.
+    step_space : ARRAY
+        The possible steps which can be taken.
+    n_step : INT
+        Number of steps it should take.
+    policy : STR
+        Choose a politcy (greedy / e_greedy).
+    limits : ARRAY
+        The limit for the x-axis and y-axis (XLIM, YLIM).
+    update : STR
+        Choose the algorithm to update the Q table (simple / SARSA / Q_LEARNING).
+
+    Returns
+    -------
+    None.
+
+    """
+
     xlim, ylim = limits
 
+    # Get a random start state
     state = np.random.randint(0, [xlim - 1, ylim - 1], dtype=int)
+
+    # Get an action based on the policy
     if policy == 'e_greedy':
         action = agent.e_greedy(state)
     else:
         action = agent.greedy(state)
 
+    # Create the random walk.
     steps = np.random.choice(step_space, n_step, replace=True)
 
+    # Walk the the random walk
     for step in steps:
+        # Get the next step based on taken action and current state
         next_state, R = env.step(state, step, action)
+
+        # Get the next action based on chosen policy
         if policy == 'e_greedy':
             next_action = agent.e_greedy(next_state)
         else:
             next_action = agent.greedy(next_state)
-        agent.update_sarsa(R, state, action, next_state, next_action)
-        # agent.update(state, action, R)
+
+        # Update the Q table
+        if update == "SARSA":
+            agent.update_sarsa(R, state, action, next_state, next_action)
+        elif update == "Q_LEARNING":
+            agent.update_Q_learning(R, state, action, next_state)
+        else:
+            agent.update(state, action, R)
+
         state = next_state
         action = next_action
 
+    # Compare the greedy policy on the created Q table with
+    # the greedy policy on the true mean reward functions
     result = check_result(env.reward, agent.Q, agent.action_space, limits)
     accuracy = np.count_nonzero(result[0]) / result[0].size
 
+    # Save the accuracy
     agent.accuracy = np.append(agent.accuracy, accuracy)
-
-    return result

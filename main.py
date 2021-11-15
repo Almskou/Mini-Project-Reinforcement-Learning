@@ -9,24 +9,39 @@ import os
 import numpy as np
 from numpy.random import multivariate_normal as mnormal
 
+from tqdm import tqdm
+
 import classes
 import helpers
 
 # %% Global Variables
-XLIM = 15
-YLIM = 15
-NSTEP = 100
-NEPISODES = 1000
-RHO = 0.8
-NBEAMS = 4
+
+# Enviroment parameters
+XLIM = 10
+YLIM = 10
+
+# Action space
+NBEAMS = 8
+
+# Simulation parameters
+NSTEP = 10000
+NEPISODES = 200
+
+# Parameters when creating the covariance matrix
+RHO = 0.8  # Correlation factor
+SIGMA_SQUARED = 100  # Noise variance
+
+# Methods:
+POLICY = "e_greedy"  # "greedy", "e_greedy"
+UPDATE = "SARSA"  # "simple", "SARSA", "Q_LEARNING"
+
+# PLOTS
 PLOT = True
 
 # %% main
 
 if __name__ == '__main__':
-
-    # Correlation factor of reward function
-    rho = RHO
+    print("\n\nStarting")
 
     # Step space
     step_space = ["left", "right", "up", "down",
@@ -35,77 +50,83 @@ if __name__ == '__main__':
     # Beam Space
     beam_space = range(NBEAMS)
 
-    # See if cov matrix is avaible:
-    if os.path.exists(f"cov/cov_{XLIM}x{YLIM}_{rho}.npy"):
+    # See if cov matrix is avaible, if not create it:
+    if os.path.exists(f"cov/cov_{XLIM}x{YLIM}_{RHO}_{SIGMA_SQUARED}.npy"):
         print("Load covariance matrix")
-        cov = np.load(f"cov/cov_{XLIM}x{YLIM}_{rho}.npy")
+        cov = np.load(f"cov/cov_{XLIM}x{YLIM}_{RHO}_{SIGMA_SQUARED}.npy")
     else:
         print("Create covariance matrix")
-        cov = helpers.getCov(XLIM, YLIM, rho)
+        cov = helpers.getCov(XLIM, YLIM, RHO, SIGMA_SQUARED)
         if not os.path.exists("cov"):
             os.makedirs("cov")
-        np.save(f"cov/cov_{XLIM}x{YLIM}_{rho}.npy", cov)
+        np.save(f"cov/cov_{XLIM}x{YLIM}_{RHO}_{SIGMA_SQUARED}.npy", cov)
 
+    # Create the reward matrices
+    print("Create reward matrix")
     reward = np.zeros([XLIM, YLIM, len(beam_space)])
 
     for idx, _ in enumerate(beam_space):
-        reward_tmp = mnormal(mean=np.zeros(XLIM * YLIM) + 150, cov=cov*1000, size=1)
+        reward_tmp = mnormal(mean=np.zeros(XLIM * YLIM) + 150, cov=cov, size=1)
         reward[:, :, idx] = reward_tmp.reshape([XLIM, YLIM])
 
     # Get environment
+    print("Creating enviroment")
     env = classes.GridWorld(XLIM, YLIM, reward, sigma=1)
 
     # Create agent.
     print('Creating agents')
-    agents = [classes.Agent(action_space=beam_space, gamma=0.7, eps=x) for x in np.linspace(0.0, 0.01, 2, endpoint=True)]
+    agents = [classes.Agent(action_space=beam_space, gamma=0.7, eps=x)
+              for x in np.linspace(0.0, 0.01, 2, endpoint=True)]
 
-    for episode in range(NEPISODES):
-        if not (episode % 10):
-            print(episode)
-
+    print('Start simulating')
+    for episode in tqdm(range(NEPISODES), desc="Episodes:"):
         for agent in agents:
-            helpers.game(env, agent, step_space, NSTEP, 'e_greedy', [XLIM, YLIM])
+            helpers.game(env, agent, step_space, NSTEP, POLICY, [XLIM, YLIM], UPDATE)
 
+    print("\nResults:")
     for agent in agents:
-        print(
-            f'We choose the optimal choice {agent.accuracy[-1] * 100:.2f}% of the time with {agent.eps:.2f}-greedy policy')
+        print(f"We choose the optimal choice {agent.accuracy[-1] * 100:.2f}%" +
+              f" of the time with {agent.eps:.2f}-greedy policy")
 
     # %% plots
     if PLOT:
         import matplotlib.pyplot as plt
         from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
-        vmin = min(np.min(reward), np.min(reward))
-        vmax = max(np.max(reward), np.max(reward))
+        # plots the tru mean of the reward matrices for each beam direction.
+        if NBEAMS < 8:
+            vmin = min(np.min(reward), np.min(reward))
+            vmax = max(np.max(reward), np.max(reward))
 
-        fig, ax = plt.subplots(np.shape(reward)[-1], 1, sharex=True)
-        for idx in range(np.shape(reward)[-1]):
-            ax[idx].set_title(f"Reward {idx} - mean")
-            s = ax[idx].imshow(reward[:, :, idx], vmin=vmin, vmax=vmax, origin="lower",
-                               interpolation='None', aspect="auto")
-            ax[idx].set_xlim([-1, XLIM])
-            ax[idx].set_ylim([-1, YLIM])
+            fig, ax = plt.subplots(np.shape(reward)[-1], 1, sharex=True)
+            for idx in range(np.shape(reward)[-1]):
+                ax[idx].set_title(f"Reward {idx} - mean")
+                s = ax[idx].imshow(reward[:, :, idx], vmin=vmin, vmax=vmax, origin="lower",
+                                   interpolation='None', aspect="auto")
+                ax[idx].set_xlim([-1, XLIM])
+                ax[idx].set_ylim([-1, YLIM])
 
-        axins = inset_axes(ax[-1],
-                           width="100%",  # width = 100% of parent_bbox width
-                           height="5%",  # height : 5%
-                           loc='lower center',
-                           bbox_to_anchor=(0, -0.5, 1, 1),
-                           bbox_transform=ax[-1].transAxes,
-                           borderpad=0,
-                           )
+            axins = inset_axes(ax[-1],
+                               width="100%",  # width = 100% of parent_bbox width
+                               height="5%",  # height : 5%
+                               loc='lower center',
+                               bbox_to_anchor=(0, -0.5, 1, 1),
+                               bbox_transform=ax[-1].transAxes,
+                               borderpad=0,
+                               )
 
-        fig.colorbar(s, ax=ax[-1], cax=axins, orientation="horizontal")
+            fig.colorbar(s, ax=ax[-1], cax=axins, orientation="horizontal")
 
-        fig.set_figheight(15)
-        fig.set_figwidth(15)
-        fig.tight_layout(pad=3.0)
+            fig.set_figheight(15)
+            fig.set_figwidth(15)
+            fig.tight_layout(pad=3.0)
 
+        # plots the accuracy for each episode
         plt.figure(2)
         for agent in agents:
             plt.plot(agent.accuracy[1:] * 100, label=f'Eps={agent.eps:.2f}')
 
-        plt.title('Epsilon-greedy with varying epsilon')
+        plt.title(f'Epsilon-greedy with varying epsilon - {UPDATE}')
         plt.xlabel('Number of episodes')
         plt.ylabel('%-age the optimal choice is chosen [%]')
         plt.legend()
