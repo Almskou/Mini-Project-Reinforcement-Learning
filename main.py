@@ -24,16 +24,17 @@ YLIM = 10
 NBEAMS = 8
 
 # Simulation parameters
-NSTEP = 10000
-NEPISODES = 200
+NSTEP = 1000
+NEPISODES = 100
 
 # Parameters when creating the covariance matrix
 RHO = 0.8  # Correlation factor
 SIGMA_SQUARED = 100  # Noise variance
 
 # Methods:
-POLICY = "e_greedy"  # "greedy", "e_greedy"
-UPDATE = "SARSA"  # "simple", "SARSA", "Q_LEARNING"
+POLICY = "UBC"  # "greedy", "e_greedy", "UBC"
+UPDATE = "Q_LEARNING"  # "simple", "SARSA", "Q_LEARNING"
+ALPHA = ["constant", 0.7]  # ["method", "start_value"] - "constant", "1/n"
 
 # PLOTS
 PLOT = True
@@ -75,13 +76,17 @@ if __name__ == '__main__':
 
     # Create agent.
     print('Creating agents')
-    agents = [classes.Agent(action_space=beam_space, gamma=0.7, eps=x)
-              for x in np.linspace(0.0, 0.01, 2, endpoint=True)]
+    if POLICY == "UBC":
+        agents = [classes.Agent(action_space=beam_space, alpha=ALPHA, gamma=0.7, c=x)
+                  for x in [100, 1000, 10000, 100000]]
+    else:
+        agents = [classes.Agent(action_space=beam_space, alpha=ALPHA, gamma=0.7, eps=x)
+                  for x in np.linspace(0.0, 0.01, 2, endpoint=True)]
 
     print('Start simulating')
     for episode in tqdm(range(NEPISODES), desc="Episodes:"):
         for agent in agents:
-            helpers.game(env, agent, step_space, NSTEP, POLICY, [XLIM, YLIM], UPDATE)
+            helpers.game(env, agent, step_space, NSTEP, POLICY, [XLIM, YLIM], UPDATE, episode)
 
     print("\nResults:")
     for agent in agents:
@@ -123,10 +128,14 @@ if __name__ == '__main__':
 
         # plots the accuracy for each episode
         plt.figure(2)
-        for agent in agents:
-            plt.plot(agent.accuracy[1:] * 100, label=f'Eps={agent.eps:.2f}')
+        if POLICY == "UBC":
+            for agent in agents:
+                plt.plot(agent.accuracy[1:] * 100, label=f'c={agent.c:.2f}')
+        else:
+            for agent in agents:
+                plt.plot(agent.accuracy[1:] * 100, label=f'Eps={agent.eps:.2f}')
 
-        plt.title(f'Epsilon-greedy with varying epsilon - {UPDATE}')
+        plt.title(f'{UPDATE} - Steps: {NSTEP}, alpha: {ALPHA}')
         plt.xlabel('Number of episodes')
         plt.ylabel('%-age the optimal choice is chosen [%]')
         plt.legend()

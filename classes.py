@@ -112,7 +112,7 @@ class GridWorld():
 
 # %% Agent Class
 class Agent:
-    def __init__(self, action_space, alpha=0.25, eps=0.1, gamma=0.7):
+    def __init__(self, action_space, alpha=["constant", 0.7], eps=0.1, gamma=0.7, c=200):
         """
         Initialise the agent with the action space and the parameters for the different reinforcement algorithms
 
@@ -126,6 +126,8 @@ class Agent:
             Parameter for eps-greedy [0, 1]. The default is 0.1.
         gamma : FLOAT, optional
             Parameter used in SARSA. The default is 0.7.
+        c : FLOAT, optional
+            Parameter used in UBC. The default is 200.
 
         Returns
         -------
@@ -133,11 +135,55 @@ class Agent:
 
         """
         self.action_space = action_space  # Number of beam directions
-        self.alpha = alpha
+        self.alpha_start = alpha[1]
+        self.alpha_method = alpha[0]
+        self.alpha = defaultdict(self._initiate_dict(alpha[1]))
         self.eps = eps
         self.gamma = gamma
-        self.Q = defaultdict(int)
+        self.c = c
+        self.Q = defaultdict(self._initiate_dict(0))
         self.accuracy = np.zeros(1)
+
+    def _initiate_dict(self, value1, value2=1):
+        """
+        Small function used when initiating the dicts.
+        For the alpha dict, value1 is alphas starting value.
+        Value2 should be set to 1 as it is used to log the number of times it has been used.
+
+        Parameters
+        ----------
+        value1 : FLOAT
+            First value in the array.
+        value2 : FLOAT, optional
+            Second value in the array. The default is 1.
+
+        Returns
+        -------
+        TYPE
+            An iterative type which defaultdict can use to set starting values.
+
+        """
+        return lambda: [value1, value2]
+
+    def _update_alpha(self, state, action):
+        """
+        Updates the alpha values if method "1/n" has been chosen
+
+        Parameters
+        ----------
+        state : ARRAY
+            Current position (x,y).
+        action : INT
+            Current action taken.
+
+        Returns
+        -------
+        None.
+
+        """
+        if self.alpha_method == "1/n":
+            self.alpha[state, action] = [self.alpha_start*(1/self.alpha[state, action][1]),
+                                         1+self.alpha[state, action][1]]
 
     def greedy(self, state):
         """
@@ -157,12 +203,12 @@ class Agent:
         state = tuple(state)  # np.array not hashable
 
         beam_dir = self.action_space[0]
-        r_est = self.Q[state, beam_dir]
+        r_est = self.Q[state, beam_dir][0]
 
         for action in self.action_space:
-            if self.Q[state, action] > r_est:
+            if self.Q[state, action][0] > r_est:
                 beam_dir = action
-                r_est = self.Q[state, action]
+                r_est = self.Q[state, action][0]
 
         return beam_dir
 
@@ -187,6 +233,39 @@ class Agent:
         else:
             return np.random.choice(self.action_space)
 
+    def UBC(self, state, t):
+        """
+        Uses the Upper Bound Confidence method as a policy. See eq. (2.10)
+        in the book:
+        Reinforcement Learning - An introduction.
+        Second edition by Richard S. Sutton and Andrew G. Barto
+
+        Parameters
+        ----------
+        state : ARRAY
+            Current position (x,y).
+        t : INT
+            Current time step.
+
+        Returns
+        -------
+        beam_dir : INT
+            Beam direction.
+
+        """
+        state = tuple(state)  # np.array not hashable
+
+        beam_dir = self.action_space[0]
+        r_est = self.Q[state, beam_dir][0] + self.c*np.sqrt(np.log(t)/self.Q[state, beam_dir][1])
+
+        for action in self.action_space:
+            r_est_new = self.Q[state, action][0] + self.c*np.sqrt(np.log(t)/self.Q[state, action][1])
+            if r_est_new > r_est:
+                beam_dir = action
+                r_est = r_est_new
+
+        return beam_dir
+
     def update(self, state, action, reward):
         """
         Update the Q table for the given state and action based on equation (2.5)
@@ -210,8 +289,10 @@ class Agent:
         """
         state = tuple(state)
 
-        self.Q[state, action] = (self.Q[state, action] +
-                                 self.alpha * (reward - self.Q[state, action]))
+        self.Q[state, action] = [(self.Q[state, action][0] +
+                                  self.alpha[state, action][0] * (reward - self.Q[state, action][0])),
+                                 self.Q[state, action][1]+1]
+        self._update_alpha(state, action)
 
     def update_sarsa(self, R, state, action, next_state, next_action):
         """
@@ -240,9 +321,12 @@ class Agent:
         """
         next_state = tuple(next_state)
         state = tuple(state)
-        next_Q = self.Q[next_state, next_action]
+        next_Q = self.Q[next_state, next_action][0]
 
-        self.Q[state, action] += self.alpha * (R + self.gamma * next_Q - self.Q[state, action])
+        self.Q[state, action] = [self.Q[state, action][0] + self.alpha[state, action][0] *
+                                 (R + self.gamma * next_Q - self.Q[state, action][0]),
+                                 self.Q[state, action][1]+1]
+        self._update_alpha(state, action)
 
     def update_Q_learning(self, R, state, action, next_state):
         """
@@ -270,6 +354,9 @@ class Agent:
         next_state = tuple(next_state)
         state = tuple(state)
         next_action = self.greedy(next_state)
-        next_Q = self.Q[next_state, next_action]
+        next_Q = self.Q[next_state, next_action][0]
 
-        self.Q[state, action] += self.alpha * (R + self.gamma * next_Q - self.Q[state, action])
+        self.Q[state, action] = [self.Q[state, action][0] + self.alpha[state, action][0] *
+                                 (R + self.gamma * next_Q - self.Q[state, action][0]),
+                                 self.Q[state, action][1]+1]
+        self._update_alpha(state, action)

@@ -104,7 +104,7 @@ def check_result(reward, Q, beam_space, limits):
     return result, optimal_choice, Q_choice
 
 
-def game(env, agent, step_space, n_step, policy, limits, update):
+def game(env, agent, step_space, n_step, policy, limits, update, episode):
     """
     Run one episode of the "game"
 
@@ -124,6 +124,8 @@ def game(env, agent, step_space, n_step, policy, limits, update):
         The limit for the x-axis and y-axis (XLIM, YLIM).
     update : STR
         Choose the algorithm to update the Q table (simple / SARSA / Q_LEARNING).
+    episode: INT
+        Which episiode it is currently. Used when policty is "UBC"
 
     Returns
     -------
@@ -139,6 +141,8 @@ def game(env, agent, step_space, n_step, policy, limits, update):
     # Get an action based on the policy
     if policy == 'e_greedy':
         action = agent.e_greedy(state)
+    elif policy == "UBC":
+        action = agent.UBC(state, 1 + n_step*episode)
     else:
         action = agent.greedy(state)
 
@@ -146,13 +150,15 @@ def game(env, agent, step_space, n_step, policy, limits, update):
     steps = np.random.choice(step_space, n_step, replace=True)
 
     # Walk the the random walk
-    for step in steps:
+    for idx, step in enumerate(steps):
         # Get the next step based on taken action and current state
         next_state, R = env.step(state, step, action)
 
         # Get the next action based on chosen policy
         if policy == 'e_greedy':
             next_action = agent.e_greedy(next_state)
+        elif policy == "UBC":
+            next_action = agent.UBC(next_state, 1 + idx + n_step*episode)
         else:
             next_action = agent.greedy(next_state)
 
