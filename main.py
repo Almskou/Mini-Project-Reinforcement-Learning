@@ -32,7 +32,7 @@ RHO = 0.8  # Correlation factor
 SIGMA_SQUARED = 100  # Noise variance
 
 # Methods:
-POLICY = "UBC"  # "greedy", "e_greedy", "UBC"
+POLICY = "UCB"  # "greedy", "e_greedy", "UCB"
 UPDATE = "SARSA"  # "simple", "SARSA", "Q_LEARNING"
 ALPHA = ["constant", 0.7]  # ["method", "start_value"] - "constant", "1/n"
 
@@ -76,7 +76,7 @@ if __name__ == '__main__':
 
     # Create agent.
     print('Creating agents', flush=True)
-    if POLICY == "UBC":
+    if POLICY == "UCB":
         agents = [classes.Agent(action_space=beam_space, alpha=ALPHA, gamma=0.7, c=x)
                   for x in [100, 1000, 10000, 100000]]
     else:
@@ -90,9 +90,9 @@ if __name__ == '__main__':
 
     print("\nResults:", flush=True)
     for agent in agents:
-        if POLICY == "UBC":
+        if POLICY == "UCB":
             print(f"We choose the optimal choice {agent.accuracy[-1] * 100:.2f}%" +
-                  f" of the time with an UBC policy and c = {agent.c:.2f}")
+                  f" of the time with an UCB policy and c = {agent.c:.2f}")
         else:
             print(f"We choose the optimal choice {agent.accuracy[-1] * 100:.2f}%" +
                   f" of the time with {agent.eps:.2f}-greedy policy")
@@ -132,7 +132,7 @@ if __name__ == '__main__':
 
         # plots the accuracy for each episode
         plt.figure(2)
-        if POLICY == "UBC":
+        if POLICY == "UCB":
             for agent in agents:
                 plt.plot(agent.accuracy[1:] * 100, label=f'c={agent.c:.2f}')
         else:

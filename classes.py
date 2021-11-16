@@ -127,7 +127,7 @@ class Agent:
         gamma : FLOAT, optional
             Parameter used in SARSA. The default is 0.7.
         c : FLOAT, optional
-            Parameter used in UBC. The default is 200.
+            Parameter used in UCB. The default is 200.
 
         Returns
         -------
@@ -233,7 +233,7 @@ class Agent:
         else:
             return np.random.choice(self.action_space)
 
-    def UBC(self, state, t):
+    def UCB(self, state, t):
         """
         Uses the Upper Bound Confidence method as a policy. See eq. (2.10)
         in the book:

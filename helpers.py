@@ -125,7 +125,7 @@ def game(env, agent, step_space, n_step, policy, limits, update, episode):
     update : STR
         Choose the algorithm to update the Q table (simple / SARSA / Q_LEARNING).
     episode: INT
-        Which episiode it is currently. Used when policty is "UBC"
+        Which episiode it is currently. Used when policty is "UCB"
 
     Returns
     -------
@@ -141,8 +141,8 @@ def game(env, agent, step_space, n_step, policy, limits, update, episode):
     # Get an action based on the policy
     if policy == 'e_greedy':
         action = agent.e_greedy(state)
-    elif policy == "UBC":
-        action = agent.UBC(state, 1 + n_step*episode)
+    elif policy == "UCB":
+        action = agent.UCB(state, 1 + n_step*episode)
     else:
         action = agent.greedy(state)
 
@@ -157,8 +157,8 @@ def game(env, agent, step_space, n_step, policy, limits, update, episode):
         # Get the next action based on chosen policy
         if policy == 'e_greedy':
             next_action = agent.e_greedy(next_state)
-        elif policy == "UBC":
-            next_action = agent.UBC(next_state, 1 + idx + n_step*episode)
+        elif policy == "UCB":
+            next_action = agent.UCB(next_state, 1 + idx + n_step*episode)
         else:
             next_action = agent.greedy(next_state)
 
