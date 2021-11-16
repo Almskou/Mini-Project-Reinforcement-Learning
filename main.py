@@ -84,14 +84,18 @@ if __name__ == '__main__':
                   for x in np.linspace(0.0, 0.01, 2, endpoint=True)]
 
     print('Start simulating', flush=True)
-    for episode in tqdm(range(NEPISODES), desc="Episodes:"):
+    for episode in tqdm(range(NEPISODES), desc="Episodes"):
         for agent in agents:
             helpers.game(env, agent, step_space, NSTEP, POLICY, [XLIM, YLIM], UPDATE, episode)
 
     print("\nResults:", flush=True)
     for agent in agents:
-        print(f"We choose the optimal choice {agent.accuracy[-1] * 100:.2f}%" +
-              f" of the time with {agent.eps:.2f}-greedy policy")
+        if POLICY == "UBC":
+            print(f"We choose the optimal choice {agent.accuracy[-1] * 100:.2f}%" +
+                  f" of the time with an UBC policy and c = {agent.c:.2f}")
+        else:
+            print(f"We choose the optimal choice {agent.accuracy[-1] * 100:.2f}%" +
+                  f" of the time with {agent.eps:.2f}-greedy policy")
 
     # %% plots
     if PLOT:
