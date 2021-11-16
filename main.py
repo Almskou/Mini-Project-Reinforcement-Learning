@@ -33,7 +33,7 @@ SIGMA_SQUARED = 100  # Noise variance
 
 # Methods:
 POLICY = "UBC"  # "greedy", "e_greedy", "UBC"
-UPDATE = "Q_LEARNING"  # "simple", "SARSA", "Q_LEARNING"
+UPDATE = "SARSA"  # "simple", "SARSA", "Q_LEARNING"
 ALPHA = ["constant", 0.7]  # ["method", "start_value"] - "constant", "1/n"
 
 # PLOTS
@@ -42,7 +42,7 @@ PLOT = True
 # %% main
 
 if __name__ == '__main__':
-    print("\n\nStarting")
+    print("Starting", flush=True)
 
     # Step space
     step_space = ["left", "right", "up", "down",
@@ -53,17 +53,17 @@ if __name__ == '__main__':
 
     # See if cov matrix is avaible, if not create it:
     if os.path.exists(f"cov/cov_{XLIM}x{YLIM}_{RHO}_{SIGMA_SQUARED}.npy"):
-        print("Load covariance matrix")
+        print("Load covariance matrix", flush=True)
         cov = np.load(f"cov/cov_{XLIM}x{YLIM}_{RHO}_{SIGMA_SQUARED}.npy")
     else:
-        print("Create covariance matrix")
+        print("Create covariance matrix", flush=True)
         cov = helpers.getCov(XLIM, YLIM, RHO, SIGMA_SQUARED)
         if not os.path.exists("cov"):
             os.makedirs("cov")
         np.save(f"cov/cov_{XLIM}x{YLIM}_{RHO}_{SIGMA_SQUARED}.npy", cov)
 
     # Create the reward matrices
-    print("Create reward matrix")
+    print("Create reward matrix", flush=True)
     reward = np.zeros([XLIM, YLIM, len(beam_space)])
 
     for idx, _ in enumerate(beam_space):
@@ -71,11 +71,11 @@ if __name__ == '__main__':
         reward[:, :, idx] = reward_tmp.reshape([XLIM, YLIM])
 
     # Get environment
-    print("Creating enviroment")
+    print("Creating enviroment", flush=True)
     env = classes.GridWorld(XLIM, YLIM, reward, sigma=1)
 
     # Create agent.
-    print('Creating agents')
+    print('Creating agents', flush=True)
     if POLICY == "UBC":
         agents = [classes.Agent(action_space=beam_space, alpha=ALPHA, gamma=0.7, c=x)
                   for x in [100, 1000, 10000, 100000]]
@@ -83,12 +83,12 @@ if __name__ == '__main__':
         agents = [classes.Agent(action_space=beam_space, alpha=ALPHA, gamma=0.7, eps=x)
                   for x in np.linspace(0.0, 0.01, 2, endpoint=True)]
 
-    print('Start simulating')
+    print('Start simulating', flush=True)
     for episode in tqdm(range(NEPISODES), desc="Episodes:"):
         for agent in agents:
             helpers.game(env, agent, step_space, NSTEP, POLICY, [XLIM, YLIM], UPDATE, episode)
 
-    print("\nResults:")
+    print("\nResults:", flush=True)
     for agent in agents:
         print(f"We choose the optimal choice {agent.accuracy[-1] * 100:.2f}%" +
               f" of the time with {agent.eps:.2f}-greedy policy")
